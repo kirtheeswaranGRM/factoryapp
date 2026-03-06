@@ -1,0 +1,90 @@
+# FACTORY MANAGEMENT SYSTEM - FULL APPLICATION WORKFLOW
+
+This document explains the full operational flow of the Factory Management System, including the interactions between the Mobile Frontend, Node.js Backend, and PostgreSQL Database.
+
+## 1. WORKFLOW DIAGRAM
+
+```mermaid
+graph TD
+    %% Roles
+    User((User)) --> Login[Login Screen]
+
+    %% Authentication & Entry
+    Login -- POST /login --> Auth{Auth & Role?}
+    Auth -- FAIL --> Login
+    Auth -- OPERATOR --> OpFlow[Operator Workflow]
+    Auth -- PRODUCTION HEAD --> PHeadFlow[Prod Head Workflow]
+    Auth -- QUALITY --> QAFlow[QA Workflow]
+
+    %% Operator Workflow
+    OpFlow --> MachList[Machinery List]
+    MachList -- View Detail --> MachSetup[Machine Setup & Start]
+    MachSetup -- Timer / Calculation --> LiveCount[Live Production Counting]
+    LiveCount -- Periodic --> HourlyReport[Hourly Output Logging]
+    HourlyReport -- POST /hourly_logs --> DB[(PostgreSQL)]
+    LiveCount -- Stop Machine --> FinalReport[Final Production Report]
+    FinalReport -- POST /production_logs --> PendingApproval[Approval Queue]
+
+    %% Production Head Workflow
+    PHeadFlow --> PHeadDash[PHead Dashboard]
+    PHeadDash --> Approvals[Report Approvals]
+    Approvals -- GET /head/pending_reports --> DB
+    Approvals -- POST /update_approval --> ApprovedLogs[Approved Production Logs]
+    
+    PHeadDash --> Monitoring[Live Floor Monitoring]
+    Monitoring -- GET /machines --> DB
+    
+    PHeadDash --> Inventory[Inventory Management]
+    Inventory -- GET/PUT/POST /inventory/* --> DB
+    
+    PHeadDash --> Attendance[Staff Attendance]
+    Attendance -- GET/POST /attendance/* --> DB
+
+    %% Quality Workflow
+    QAFlow --> QAList[QA Machine List]
+    QAList --> Inspection[Unit Inspection Modal]
+    Inspection -- POST /qc_logs --> DB
+
+    %% Master Controls (Operator Role)
+    MachList -- PAUSE ALL / RESUME ALL --> PowerToggle[Power Toggle]
+    PowerToggle -- PUT /machines/power-toggle --> DB
+```
+
+## 2. DETAILED FLOW EXPLANATION
+
+### A. Authentication & Authorization
+- **Role Selection**: Users select their department (Operator, Production Head, Quality) and log in with email/password.
+- **Attendance Trigger**: When a Production Head or QA staff logs in, the system automatically logs their login time into the `head_attendance` table via the `/head-attendance/log` API.
+
+### B. Operator Workflow (Production Execution)
+1. **Machine Selection**: Operators see a live list of all machines (`UNIT 1`, `UNIT 2`, etc.) and their current status (Running, Paused, Idle).
+2. **Setup**: Before starting a machine, operators must select the **Product**, **Materials** (up to 4 types), **Color**, **Mold**, and **Cavity**.
+3. **Execution**: 
+   - Starting the machine sets a `start_time` in the DB.
+   - The frontend calculates "Live Pieces" using the formula: `Floor(Elapsed Seconds / Cycle Time) * Cavity`.
+4. **Hourly Reporting**: Every hour (or manually), operators log checks for Chiller, Compressor, Mold, and Machine status along with hourly output.
+5. **Final Submission**: When production stops, a final report is generated and sent for approval. The machine status returns to 'IDLE'.
+
+### C. Production Head Workflow (Management & Oversight)
+1. **Approvals**: The PHead reviews pending production logs submitted by operators. They can Approve or Reject reports. Approved reports are used for final stock/reporting.
+2. **Monitoring**: A real-time view of the entire factory floor status, showing which machines are running and their current output counts.
+3. **Inventory**: Management of Raw Materials, Colors, Molds, and Finished Products. Includes updating stock levels and adding new items.
+4. **Attendance**: Marking and reviewing attendance for the general staff and operators.
+
+### D. Quality Assurance Workflow (Inspection)
+1. **Periodic Checks**: QA staff move from machine to machine.
+2. **Inspection**: For each machine, they record the average weight of parts, rejection pieces, and general remarks.
+3. **Logging**: Inspections are saved via the `/qc_logs` API for quality trend analysis.
+
+### E. Master Controls
+- **Power Toggle**: In case of a power cut or factory-wide pause, the Operator screen provides "PAUSE ALL" and "RESUME ALL" buttons.
+- **Logic**: Pausing calculates the current production and freezes the `accumulated_output` so no data is lost during the downtime.
+
+## 3. DATA ARCHITECTURE (Core Tables)
+- `users`: Authentication and roles.
+- `machine_status`: Real-time state of each machine.
+- `production_logs`: History of production runs (Pending/Approved).
+- `inventory_*`: Stock levels for materials, products, and molds.
+- `hourly_logs`: Granular production data points.
+- `qc_logs`: Quality inspection records.
+- `attendance`: Staff daily attendance.

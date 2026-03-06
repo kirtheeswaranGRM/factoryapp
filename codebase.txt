@@ -1,0 +1,23 @@
+FACTORY MANAGEMENT SYSTEM - CODEBASE OVERVIEW
+
+--- BACKEND (Node.js/Express) ---
+- server.js: Application entry point and server initialization.
+- db.js: PostgreSQL connection pool and database configuration.
+- routes.js: API endpoint definitions for all business logic.
+- apiconfig.js: Server network settings (Host/Port).
+- downreports.js: PDF generation logic for production reports.
+- inventorycontroller.js: Handles inventory-specific API requests.
+- manageinventory.js: Logic for material and mold management.
+
+--- FRONTEND (Expo/React Native) ---
+- app/index.tsx: Main entry point for the mobile app navigation.
+- app/ApiConfig.tsx: Stores the backend server IP and base URL.
+- app/login.tsx: User authentication and role-based login logic.
+- app/phead.tsx: Production Head dashboard.
+- app/machineries.tsx: Grid/List view of factory machinery.
+- app/machinedetail.tsx: Detailed status and info for specific machines.
+- app/quality.tsx: Quality assurance and defect logging screen.
+- app/hourly_report.tsx: Interface for submitting hourly production data.
+
+--- DATABASE ---
+- db/backup.sql: SQL schema and seed data for the PostgreSQL database.
